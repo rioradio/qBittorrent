@@ -670,6 +670,7 @@ void WebApplication::sessionInitialize()
             else
             {
                 m_currentSession->updateTimestamp();
+                setSessionCookie(m_currentSession->id());
             }
         }
         else
@@ -746,15 +747,7 @@ void WebApplication::sessionStart()
     connect(btSession, &BitTorrent::Session::freeDiskSpaceChecked, syncController, &SyncController::updateFreeDiskSpace);
     m_currentSession->registerAPIController(u"sync"_s, syncController);
 
-    QNetworkCookie cookie {m_sessionCookieName.toLatin1(), m_currentSession->id().toLatin1()};
-    cookie.setHttpOnly(true);
-    cookie.setSecure(m_isSecureCookieEnabled && isOriginTrustworthy());  // [rfc6265] 4.1.2.5. The Secure Attribute
-    cookie.setPath(u"/"_s);
-    if (m_isCSRFProtectionEnabled)
-        cookie.setSameSitePolicy(QNetworkCookie::SameSite::Strict);
-    else if (cookie.isSecure())
-        cookie.setSameSitePolicy(QNetworkCookie::SameSite::None);
-    setHeader({Http::HEADER_SET_COOKIE, QString::fromLatin1(cookie.toRawForm())});
+    setSessionCookie(m_currentSession->id());
 }
 
 void WebApplication::sessionEnd()
@@ -767,6 +760,21 @@ void WebApplication::sessionEnd()
 
     delete m_sessions.take(m_currentSession->id());
     m_currentSession = nullptr;
+
+    setHeader({Http::HEADER_SET_COOKIE, QString::fromLatin1(cookie.toRawForm())});
+}
+
+void WebApplication::setSessionCookie(const QString &sessionId)
+{
+    QNetworkCookie cookie {m_sessionCookieName.toLatin1(), sessionId.toLatin1()};
+    cookie.setHttpOnly(true);
+    cookie.setSecure(m_isSecureCookieEnabled && isOriginTrustworthy());
+    cookie.setPath(u"/"_s);
+    cookie.setExpirationDate(QDateTime::currentDateTime().addSecs(m_sessionTimeout));
+    if (m_isCSRFProtectionEnabled)
+        cookie.setSameSitePolicy(QNetworkCookie::SameSite::Strict);
+    else if (cookie.isSecure())
+        cookie.setSameSitePolicy(QNetworkCookie::SameSite::None);
 
     setHeader({Http::HEADER_SET_COOKIE, QString::fromLatin1(cookie.toRawForm())});
 }

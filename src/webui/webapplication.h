@@ -108,6 +108,8 @@ private:
     WebSession *session() override;
     void sessionStart() override;
     void sessionEnd() override;
+    
+    void setSessionCookie(const QString &sessionId);
 
     void doProcessRequest();
     void configure();
